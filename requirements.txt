@@ -1,20 +1,20 @@
 # Streamlit for the web application
-streamlit==1.25.0
+streamlit
 
 # Data handling and model operations
-pandas==1.5.3
-numpy==1.24.3
-scikit-learn==1.2.2
-joblib==1.2.0
+pandas
+numpy
+scikit-learn
+joblib
 
 # Finance data
-yfinance==0.2.26
+yfinance
 
 # Technical analysis indicators
-TA-Lib==0.4.0
+TA-Lib
 
 # For downloading from Google Drive
-gdown==4.7.1
+gdown
 
 # Logging and date-time handling (if needed)
 datetime
