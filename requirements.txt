@@ -1,6 +1,6 @@
 
 # Specify Python version
-python==3.10.15
+python==3.10
 
 # Streamlit for the web application
 streamlit==1.25.0
