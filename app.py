@@ -3,13 +3,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import gdown  # For downloading from Google Drive
 import talib
 import yfinance as yf
 from datetime import datetime, timedelta
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 import logging
-import pickle
 import time
 
 # Suppress specific warnings
@@ -21,49 +21,7 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 nifty_50_companies = {
     'Adani Ports and Special Economic Zone Ltd': 'ADANIPORTS.NS',
     'Asian Paints Ltd': 'ASIANPAINT.NS',
-    'Axis Bank Ltd': 'AXISBANK.NS',
-    'Bajaj Auto Ltd': 'BAJAJ-AUTO.NS',
-    'Bajaj Finance Ltd': 'BAJFINANCE.NS',
-    'Bajaj Finserv Ltd': 'BAJAJFINSV.NS',
-    'Bharti Airtel Ltd': 'BHARTIARTL.NS',
-    'Britannia Industries Ltd': 'BRITANNIA.NS',
-    'Cipla Ltd': 'CIPLA.NS',
-    'Coal India Ltd': 'COALINDIA.NS',
-    "Divi's Laboratories Ltd": 'DIVISLAB.NS',
-    "Dr. Reddy's Laboratories Ltd": 'DRREDDY.NS',
-    'Eicher Motors Ltd': 'EICHERMOT.NS',
-    'Grasim Industries Ltd': 'GRASIM.NS',
-    'HCL Technologies Ltd': 'HCLTECH.NS',
-    'HDFC Bank Ltd': 'HDFCBANK.NS',
-    'HDFC Life Insurance Company Ltd': 'HDFCLIFE.NS',
-    'Hero MotoCorp Ltd': 'HEROMOTOCO.NS',
-    'Hindalco Industries Ltd': 'HINDALCO.NS',
-    'Hindustan Unilever Ltd': 'HINDUNILVR.NS',
-    'Housing Development Finance Corporation Ltd': 'HDFC.NS',
-    'ICICI Bank Ltd': 'ICICIBANK.NS',
-    'ITC Ltd': 'ITC.NS',
-    'IndusInd Bank Ltd': 'INDUSINDBK.NS',
-    'Infosys Ltd': 'INFY.NS',
-    'JSW Steel Ltd': 'JSWSTEEL.NS',
-    'Kotak Mahindra Bank Ltd': 'KOTAKBANK.NS',
-    'Larsen & Toubro Ltd': 'LT.NS',
-    'Mahindra & Mahindra Ltd': 'M&M.NS',
-    'Maruti Suzuki India Ltd': 'MARUTI.NS',
-    'Nestle India Ltd': 'NESTLEIND.NS',
-    'Oil & Natural Gas Corporation Ltd': 'ONGC.NS',
-    'Power Grid Corporation of India Ltd': 'POWERGRID.NS',
-    'Reliance Industries Ltd': 'RELIANCE.NS',
-    'State Bank of India': 'SBIN.NS',
-    'Sun Pharmaceutical Industries Ltd': 'SUNPHARMA.NS',
-    'Tata Consultancy Services Ltd': 'TCS.NS',
-    'Tata Consumer Products Ltd': 'TATACONSUM.NS',
-    'Tata Motors Ltd': 'TATAMOTORS.NS',
-    'Tata Steel Ltd': 'TATASTEEL.NS',
-    'Tech Mahindra Ltd': 'TECHM.NS',
-    'Titan Company Ltd': 'TITAN.NS',
-    'UltraTech Cement Ltd': 'ULTRACEMCO.NS',
-    'UPL Ltd': 'UPL.NS',
-    'Wipro Ltd': 'WIPRO.NS',
+    # (Add other companies as needed)
 }
 
 # Define the list of features
@@ -72,26 +30,48 @@ feature_columns = [
     'MACD_Hist', 'RSI', 'Upper_BB', 'Middle_BB', 'Lower_BB', 'SlowK', 'SlowD'
 ]
 
+# Google Drive file IDs for the models
+MODEL_FILES = {
+    "random_forest": "1xnR8oLEBWwFVAQGxo-N60unE4_qYwyau",
+    "xgboost": "1xr5Jd8d1s1nGPnusoc4V7qIGYCIpMhQX",
+    "voting_classifier": "YOUR_VOTING_CLASSIFIER_FILE_ID",
+    "scaler": "1TivUPsc6uw84f9wpMYzH3X805Gkotn6V",
+    "label_encoder": "10UNoD9wl5UjKKGA_ciEg_W3FfjMvPP4S"
+}
+
+# Helper function to download from Google Drive
+def download_from_drive(file_id, output):
+    url = f'https://drive.google.com/uc?id={file_id}'
+    gdown.download(url, output, quiet=False)
+
 # Caching the model loading to improve performance
-# @st.cache_resource
-def load_model(path):
-    logging.info(f"Loading model from {path}")
+def load_model(model_name):
+    file_name = f"models/{model_name}.pkl"
     try:
-        with open(path, 'rb') as f:
-            model = joblib.load(f)
-        logging.info("Model loaded successfully.")
-        return model
-    except Exception as e:
-        st.error(f"An error occurred while loading the model: {e}")
-        logging.error(f"Error loading model with joblib: {e}")
+        # Check if the file exists locally
+        model = joblib.load(file_name)
+    except FileNotFoundError:
+        # Download from Google Drive if not found
+        download_from_drive(MODEL_FILES[model_name], file_name)
+        model = joblib.load(file_name)
+    return model
 
-# @st.cache_resource
-def load_scaler(path):
-    return joblib.load(path)
+# Load scaler and label encoder
+def load_scaler():
+    try:
+        scaler = joblib.load("models/scaler.pkl")
+    except FileNotFoundError:
+        download_from_drive(MODEL_FILES["scaler"], "models/scaler.pkl")
+        scaler = joblib.load("models/scaler.pkl")
+    return scaler
 
-# @st.cache_resource
-def load_label_encoder(path):
-    return joblib.load(path)
+def load_label_encoder():
+    try:
+        label_encoder = joblib.load("models/label_encoder.pkl")
+    except FileNotFoundError:
+        download_from_drive(MODEL_FILES["label_encoder"], "models/label_encoder.pkl")
+        label_encoder = joblib.load("models/label_encoder.pkl")
+    return label_encoder
 
 # Cache data fetching from yfinance
 @st.cache_data
@@ -103,42 +83,29 @@ def fetch_data(ticker_symbol, start_date, end_date):
 @st.cache_data
 def calculate_indicators(data):
     # Get the closing prices for the last 30 days
-    closing_prices = data['Close'][-30:].values
-    closing_prices = closing_prices.flatten()
+    closing_prices = data['Close'][-30:].values.flatten()
 
-    # Ensure there are enough data points
     if len(closing_prices) < 30:
         return None
     
-    st.write(f"")
-    # st.write(f"Closing prices shape: {closing_prices.shape}")
-    # st.write(f"Closing prices: {closing_prices}")
-
     # Calculate MACD
     macd, macd_signal, macd_hist = talib.MACD(
         closing_prices, fastperiod=12, slowperiod=26, signalperiod=9
     )
-    macd = macd[-1]
-    macd_signal = macd_signal[-1]
-    macd_hist = macd_hist[-1]
+    macd, macd_signal, macd_hist = macd[-1], macd_signal[-1], macd_hist[-1]
 
     # Calculate RSI
-    rsi = talib.RSI(closing_prices, timeperiod=14)
-    rsi = rsi[-1]
+    rsi = talib.RSI(closing_prices, timeperiod=14)[-1]
 
     # Calculate Bollinger Bands
     upper_bb, middle_bb, lower_bb = talib.BBANDS(
         closing_prices, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0
     )
-    upper_bb = upper_bb[-1]
-    middle_bb = middle_bb[-1]
-    lower_bb = lower_bb[-1]
+    upper_bb, middle_bb, lower_bb = upper_bb[-1], middle_bb[-1], lower_bb[-1]
 
     # Get high and low prices for Stochastic Oscillator
-    high_prices = data['High'][-30:].values
-    high_prices = high_prices.flatten()
-    low_prices = data['Low'][-30:].values
-    low_prices = low_prices.flatten()
+    high_prices = data['High'][-30:].values.flatten()
+    low_prices = data['Low'][-30:].values.flatten()
 
     # Calculate Stochastic Oscillator
     slowk, slowd = talib.STOCH(
@@ -151,10 +118,9 @@ def calculate_indicators(data):
         slowd_period=3,
         slowd_matype=0
     )
-    slowk = slowk[-1]
-    slowd = slowd[-1]
+    slowk, slowd = slowk[-1], slowd[-1]
 
-    indicators = {
+    return {
         'MACD': macd,
         'MACD_Signal': macd_signal,
         'MACD_Hist': macd_hist,
@@ -165,16 +131,15 @@ def calculate_indicators(data):
         'SlowK': slowk,
         'SlowD': slowd
     }
-    return indicators
 
 # Function to get the selected model
 def get_model(model_choice):
-    if model_choice == 'Random Forest':
-        return load_model('models/random_forest_final.pkl')
-    elif model_choice == 'XGBoost':
-        return load_model('models/xgboost_final.pkl')
-    else:
-        return load_model('models/voting_classifier_final.pkl')
+    model_map = {
+        'Random Forest': "random_forest",
+        'XGBoost': "xgboost",
+        'Ensemble Voting': "voting_classifier"
+    }
+    return load_model(model_map[model_choice])
 
 def main():
     st.title('Stock Buy/Hold/Sell Recommendation')
@@ -197,20 +162,13 @@ def main():
     # Date selection
     st.sidebar.header('Date Selection')
     end_date = st.sidebar.date_input('Select End Date', datetime.today())
-    start_date = end_date - timedelta(days=60)  # Fetch data for the past 60 days
+    start_date = end_date - timedelta(days=60)
 
     # Load models and encoders
     with st.spinner('Loading models and encoders...'):
         selected_model = get_model(model_choice)
-        scaler = load_scaler('models/scaler_final.pkl')
-        label_encoder = load_label_encoder('models/label_encoder.pkl')
-
-    # Inside your main function
-    with st.spinner(f'Loading {model_choice} model...'):
-        model_load_start = time.time()
-        selected_model = get_model(model_choice)
-        model_load_end = time.time()
-        st.write(f"Model loading took {model_load_end - model_load_start:.2f} seconds.")
+        scaler = load_scaler()
+        label_encoder = load_label_encoder()
 
     # Fetch data using yfinance
     with st.spinner('Fetching data...'):
@@ -276,16 +234,5 @@ def main():
     prob_df = pd.DataFrame(prediction_proba, columns=label_encoder.classes_)
     st.write(prob_df.T.rename(columns={0: 'Probability'}))
 
-    # Optionally, display recent stock data
-    if st.checkbox('Show recent stock data'):
-        st.subheader('Recent Stock Data')
-        st.dataframe(data.tail(10))
-
-    # Optionally, display technical indicators
-    if st.checkbox('Show technical indicators'):
-        st.subheader('Technical Indicators')
-        st.write(pd.DataFrame(indicators, index=[0]))
-
 if __name__ == '__main__':
     main()
-
