@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import gdown  # For downloading from Google Drive
-import talib
+import ta  # Replaced talib with ta
 import yfinance as yf
 from datetime import datetime, timedelta
 import warnings
@@ -82,55 +82,49 @@ def fetch_data(ticker_symbol, start_date, end_date):
 # Cache technical indicator calculations
 @st.cache_data
 def calculate_indicators(data):
-    # Get the closing prices for the last 30 days
-    closing_prices = data['Close'][-30:].values.flatten()
-
-    if len(closing_prices) < 30:
+    df = data.copy()
+    
+    # Ensure there are enough data points
+    if len(df) < 30:
         return None
     
-    # Calculate MACD
-    macd, macd_signal, macd_hist = talib.MACD(
-        closing_prices, fastperiod=12, slowperiod=26, signalperiod=9
+    # MACD
+    macd = ta.trend.MACD(close=df['Close'], window_slow=26, window_fast=12, window_sign=9)
+    df['MACD'] = macd.macd()
+    df['MACD_Signal'] = macd.macd_signal()
+    df['MACD_Hist'] = macd.macd_diff()
+    
+    # RSI
+    df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
+    
+    # Bollinger Bands
+    bollinger = ta.volatility.BollingerBands(close=df['Close'], window=20, window_dev=2)
+    df['Upper_BB'] = bollinger.bollinger_hband()
+    df['Middle_BB'] = bollinger.bollinger_mavg()
+    df['Lower_BB'] = bollinger.bollinger_lband()
+    
+    # Stochastic Oscillator
+    stoch = ta.momentum.StochasticOscillator(
+        high=df['High'], low=df['Low'], close=df['Close'],
+        window=14, smooth_window=3
     )
-    macd, macd_signal, macd_hist = macd[-1], macd_signal[-1], macd_hist[-1]
-
-    # Calculate RSI
-    rsi = talib.RSI(closing_prices, timeperiod=14)[-1]
-
-    # Calculate Bollinger Bands
-    upper_bb, middle_bb, lower_bb = talib.BBANDS(
-        closing_prices, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0
-    )
-    upper_bb, middle_bb, lower_bb = upper_bb[-1], middle_bb[-1], lower_bb[-1]
-
-    # Get high and low prices for Stochastic Oscillator
-    high_prices = data['High'][-30:].values.flatten()
-    low_prices = data['Low'][-30:].values.flatten()
-
-    # Calculate Stochastic Oscillator
-    slowk, slowd = talib.STOCH(
-        high=high_prices,
-        low=low_prices,
-        close=closing_prices,
-        fastk_period=14,
-        slowk_period=3,
-        slowk_matype=0,
-        slowd_period=3,
-        slowd_matype=0
-    )
-    slowk, slowd = slowk[-1], slowd[-1]
-
-    return {
-        'MACD': macd,
-        'MACD_Signal': macd_signal,
-        'MACD_Hist': macd_hist,
-        'RSI': rsi,
-        'Upper_BB': upper_bb,
-        'Middle_BB': middle_bb,
-        'Lower_BB': lower_bb,
-        'SlowK': slowk,
-        'SlowD': slowd
+    df['SlowK'] = stoch.stoch()
+    df['SlowD'] = stoch.stoch_signal()
+    
+    # Get the latest indicators
+    latest_indicators = {
+        'MACD': df['MACD'].iloc[-1],
+        'MACD_Signal': df['MACD_Signal'].iloc[-1],
+        'MACD_Hist': df['MACD_Hist'].iloc[-1],
+        'RSI': df['RSI'].iloc[-1],
+        'Upper_BB': df['Upper_BB'].iloc[-1],
+        'Middle_BB': df['Middle_BB'].iloc[-1],
+        'Lower_BB': df['Lower_BB'].iloc[-1],
+        'SlowK': df['SlowK'].iloc[-1],
+        'SlowD': df['SlowD'].iloc[-1]
     }
+    
+    return latest_indicators
 
 # Function to get the selected model
 def get_model(model_choice):
