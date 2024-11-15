@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import talib  # Replaced ta with talib
+import ta  # Using ta instead of talib
 import gdown  # For downloading from Google Drive
 import yfinance as yf
 from datetime import datetime, timedelta
@@ -121,7 +121,7 @@ def fetch_data(ticker_symbol, start_date, end_date):
     data = yf.download(ticker_symbol, start=start_date, end=end_date)
     return data
 
-# Cache technical indicator calculations
+# Cache technical indicator calculations using ta
 @st.cache_data
 def calculate_indicators(data):
     df = data.copy()
@@ -130,45 +130,28 @@ def calculate_indicators(data):
     if len(df) < 30:
         return None
 
-    # Calculate MACD using talib
-    macd, macd_signal, macd_hist = talib.MACD(
-        df['Close'].values,
-        fastperiod=12,
-        slowperiod=26,
-        signalperiod=9
-    )
-    df['MACD'] = macd
-    df['MACD_Signal'] = macd_signal
-    df['MACD_Hist'] = macd_hist
+    # MACD
+    macd = ta.trend.MACD(close=df['Close'], window_slow=26, window_fast=12, window_sign=9)
+    df['MACD'] = macd.macd()
+    df['MACD_Signal'] = macd.macd_signal()
+    df['MACD_Hist'] = macd.macd_diff()
 
-    # Calculate RSI using talib
-    df['RSI'] = talib.RSI(df['Close'].values, timeperiod=14)
+    # RSI
+    df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
 
-    # Calculate Bollinger Bands using talib
-    upper_bb, middle_bb, lower_bb = talib.BBANDS(
-        df['Close'].values,
-        timeperiod=20,
-        nbdevup=2,
-        nbdevdn=2,
-        matype=0
-    )
-    df['Upper_BB'] = upper_bb
-    df['Middle_BB'] = middle_bb
-    df['Lower_BB'] = lower_bb
+    # Bollinger Bands
+    bollinger = ta.volatility.BollingerBands(close=df['Close'], window=20, window_dev=2)
+    df['Upper_BB'] = bollinger.bollinger_hband()
+    df['Middle_BB'] = bollinger.bollinger_mavg()
+    df['Lower_BB'] = bollinger.bollinger_lband()
 
-    # Calculate Stochastic Oscillator using talib
-    slowk, slowd = talib.STOCH(
-        df['High'].values,
-        df['Low'].values,
-        df['Close'].values,
-        fastk_period=14,
-        slowk_period=3,
-        slowk_matype=0,
-        slowd_period=3,
-        slowd_matype=0
+    # Stochastic Oscillator
+    stoch = ta.momentum.StochasticOscillator(
+        high=df['High'], low=df['Low'], close=df['Close'],
+        window=14, smooth_window=3
     )
-    df['SlowK'] = slowk
-    df['SlowD'] = slowd
+    df['SlowK'] = stoch.stoch()
+    df['SlowD'] = stoch.stoch_signal()
 
     # Get the latest indicators
     latest_indicators = {
