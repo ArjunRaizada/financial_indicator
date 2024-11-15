@@ -1,21 +1,8 @@
-# Streamlit for the web application
 streamlit
-
-# Data handling and model operations
 pandas
 numpy
-scikit-learn
 joblib
-ta
-
-# Finance data
 yfinance
-
-# Technical analysis indicators
-TA-Lib
-
-# For downloading from Google Drive
+scikit-learn
 gdown
-
-# Logging and date-time handling (if needed)
-datetime
+ta
