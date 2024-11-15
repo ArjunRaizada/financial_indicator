@@ -3,8 +3,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import talib  # Replaced ta with talib
 import gdown  # For downloading from Google Drive
-import ta  # Replaced talib with ta
 import yfinance as yf
 from datetime import datetime, timedelta
 import warnings
@@ -21,7 +21,49 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 nifty_50_companies = {
     'Adani Ports and Special Economic Zone Ltd': 'ADANIPORTS.NS',
     'Asian Paints Ltd': 'ASIANPAINT.NS',
-    # (Add other companies as needed)
+    'Axis Bank Ltd': 'AXISBANK.NS',
+    'Bajaj Auto Ltd': 'BAJAJ-AUTO.NS',
+    'Bajaj Finance Ltd': 'BAJFINANCE.NS',
+    'Bajaj Finserv Ltd': 'BAJAJFINSV.NS',
+    'Bharti Airtel Ltd': 'BHARTIARTL.NS',
+    'Britannia Industries Ltd': 'BRITANNIA.NS',
+    'Cipla Ltd': 'CIPLA.NS',
+    'Coal India Ltd': 'COALINDIA.NS',
+    "Divi's Laboratories Ltd": 'DIVISLAB.NS',
+    "Dr. Reddy's Laboratories Ltd": 'DRREDDY.NS',
+    'Eicher Motors Ltd': 'EICHERMOT.NS',
+    'Grasim Industries Ltd': 'GRASIM.NS',
+    'HCL Technologies Ltd': 'HCLTECH.NS',
+    'HDFC Bank Ltd': 'HDFCBANK.NS',
+    'HDFC Life Insurance Company Ltd': 'HDFCLIFE.NS',
+    'Hero MotoCorp Ltd': 'HEROMOTOCO.NS',
+    'Hindalco Industries Ltd': 'HINDALCO.NS',
+    'Hindustan Unilever Ltd': 'HINDUNILVR.NS',
+    'Housing Development Finance Corporation Ltd': 'HDFC.NS',
+    'ICICI Bank Ltd': 'ICICIBANK.NS',
+    'ITC Ltd': 'ITC.NS',
+    'IndusInd Bank Ltd': 'INDUSINDBK.NS',
+    'Infosys Ltd': 'INFY.NS',
+    'JSW Steel Ltd': 'JSWSTEEL.NS',
+    'Kotak Mahindra Bank Ltd': 'KOTAKBANK.NS',
+    'Larsen & Toubro Ltd': 'LT.NS',
+    'Mahindra & Mahindra Ltd': 'M&M.NS',
+    'Maruti Suzuki India Ltd': 'MARUTI.NS',
+    'Nestle India Ltd': 'NESTLEIND.NS',
+    'Oil & Natural Gas Corporation Ltd': 'ONGC.NS',
+    'Power Grid Corporation of India Ltd': 'POWERGRID.NS',
+    'Reliance Industries Ltd': 'RELIANCE.NS',
+    'State Bank of India': 'SBIN.NS',
+    'Sun Pharmaceutical Industries Ltd': 'SUNPHARMA.NS',
+    'Tata Consultancy Services Ltd': 'TCS.NS',
+    'Tata Consumer Products Ltd': 'TATACONSUM.NS',
+    'Tata Motors Ltd': 'TATAMOTORS.NS',
+    'Tata Steel Ltd': 'TATASTEEL.NS',
+    'Tech Mahindra Ltd': 'TECHM.NS',
+    'Titan Company Ltd': 'TITAN.NS',
+    'UltraTech Cement Ltd': 'ULTRACEMCO.NS',
+    'UPL Ltd': 'UPL.NS',
+    'Wipro Ltd': 'WIPRO.NS',
 }
 
 # Define the list of features
@@ -83,34 +125,51 @@ def fetch_data(ticker_symbol, start_date, end_date):
 @st.cache_data
 def calculate_indicators(data):
     df = data.copy()
-    
+
     # Ensure there are enough data points
     if len(df) < 30:
         return None
-    
-    # MACD
-    macd = ta.trend.MACD(close=df['Close'], window_slow=26, window_fast=12, window_sign=9)
-    df['MACD'] = macd.macd()
-    df['MACD_Signal'] = macd.macd_signal()
-    df['MACD_Hist'] = macd.macd_diff()
-    
-    # RSI
-    df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
-    
-    # Bollinger Bands
-    bollinger = ta.volatility.BollingerBands(close=df['Close'], window=20, window_dev=2)
-    df['Upper_BB'] = bollinger.bollinger_hband()
-    df['Middle_BB'] = bollinger.bollinger_mavg()
-    df['Lower_BB'] = bollinger.bollinger_lband()
-    
-    # Stochastic Oscillator
-    stoch = ta.momentum.StochasticOscillator(
-        high=df['High'], low=df['Low'], close=df['Close'],
-        window=14, smooth_window=3
+
+    # Calculate MACD using talib
+    macd, macd_signal, macd_hist = talib.MACD(
+        df['Close'].values,
+        fastperiod=12,
+        slowperiod=26,
+        signalperiod=9
     )
-    df['SlowK'] = stoch.stoch()
-    df['SlowD'] = stoch.stoch_signal()
-    
+    df['MACD'] = macd
+    df['MACD_Signal'] = macd_signal
+    df['MACD_Hist'] = macd_hist
+
+    # Calculate RSI using talib
+    df['RSI'] = talib.RSI(df['Close'].values, timeperiod=14)
+
+    # Calculate Bollinger Bands using talib
+    upper_bb, middle_bb, lower_bb = talib.BBANDS(
+        df['Close'].values,
+        timeperiod=20,
+        nbdevup=2,
+        nbdevdn=2,
+        matype=0
+    )
+    df['Upper_BB'] = upper_bb
+    df['Middle_BB'] = middle_bb
+    df['Lower_BB'] = lower_bb
+
+    # Calculate Stochastic Oscillator using talib
+    slowk, slowd = talib.STOCH(
+        df['High'].values,
+        df['Low'].values,
+        df['Close'].values,
+        fastk_period=14,
+        slowk_period=3,
+        slowk_matype=0,
+        slowd_period=3,
+        slowd_matype=0
+    )
+    df['SlowK'] = slowk
+    df['SlowD'] = slowd
+
     # Get the latest indicators
     latest_indicators = {
         'MACD': df['MACD'].iloc[-1],
@@ -123,7 +182,7 @@ def calculate_indicators(data):
         'SlowK': df['SlowK'].iloc[-1],
         'SlowD': df['SlowD'].iloc[-1]
     }
-    
+
     return latest_indicators
 
 # Function to get the selected model
@@ -227,6 +286,16 @@ def main():
     st.header('Prediction Probabilities')
     prob_df = pd.DataFrame(prediction_proba, columns=label_encoder.classes_)
     st.write(prob_df.T.rename(columns={0: 'Probability'}))
+
+    # Optionally, display recent stock data
+    if st.checkbox('Show recent stock data'):
+        st.subheader('Recent Stock Data')
+        st.dataframe(data.tail(10))
+
+    # Optionally, display technical indicators
+    if st.checkbox('Show technical indicators'):
+        st.subheader('Technical Indicators')
+        st.write(pd.DataFrame(indicators, index=[0]))
 
 if __name__ == '__main__':
     main()
