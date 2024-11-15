@@ -1,10 +1,16 @@
-sudo apt-get update
-sudo apt-get install -y build-essential libxml2-dev libxslt1-dev
-wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
-tar -xzvf ta-lib-0.4.0-src.tar.gz
-cd ta-lib
-./configure --prefix=/usr
-make
-sudo make install
-cd ..
-pip install TA-Lib
+!pip install streamlit
+!pip install yfinance
+!pip install joblib
+!pip install TA-Lib
+!pip install scikit-learn
+
+# Install ta-lib if it's not already installed
+!wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+!tar -xzvf ta-lib-0.4.0-src.tar.gz
+import os
+os.chdir('ta-lib')
+!./configure --prefix=/usr
+!make
+!make install
+os.chdir('../')
+!pip install TA-Lib
