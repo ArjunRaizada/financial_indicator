@@ -19,6 +19,6 @@ pip install TA-Lib
 
 # Install other Python packages
 echo "Installing required Python packages..."
-pip install streamlit pandas numpy joblib yfinance scikit-learn
+pip install streamlit pandas numpy joblib yfinance scikit-learn gdown
 
 echo "Setup completed successfully!"
