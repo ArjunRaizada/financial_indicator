@@ -11,6 +11,10 @@ import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 import logging
 import time
+import os  # Added import for os
+
+# Ensure the 'models' directory exists
+os.makedirs('models', exist_ok=True)
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
